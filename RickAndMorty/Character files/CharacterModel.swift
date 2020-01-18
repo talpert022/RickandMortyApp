@@ -15,11 +15,13 @@ protocol CharacterModelProtocol {
 
 class CharacterModel {
     
+    var dispatchGroup = DispatchGroup()
+    var allCharacters = [Character]()
     var delegate:CharacterModelProtocol?
     
-    func getCharacters() {
+    func getCharactersFromPage(page:Int) {
         
-        let nextURL = "https://rickandmortyapi.com/api/character/"
+        let nextURL = "https://rickandmortyapi.com/api/character/?page=\(page)"
         
         // Create a string url
         let stringUrl = nextURL
@@ -53,11 +55,12 @@ class CharacterModel {
                     
                     // Get the characters
                     let characters = characterService.results!
+                    
+                    // Add the characters from one page to all characters
+                    self.allCharacters += characters
+                    
 
-                    // Pass it to the view controller in main thread
-                    DispatchQueue.main.async {
-                        self.delegate?.charactersRetrieved(characters)
-                    }
+                    self.dispatchGroup.leave()
                     
                 }
                 catch {
@@ -71,6 +74,40 @@ class CharacterModel {
         
         // Start the dataTask
         dataTask.resume()
+        
+    }
+    
+    func getCharacters() {
+        
+        // Set up an operation queue
+        let operationQueue = OperationQueue()
+        
+        let operation1 = BlockOperation {
+            
+            // Iterate through the 25 character pages in the API
+            for pageNum in 1...25 {
+                
+                self.dispatchGroup.enter()
+                self.getCharactersFromPage(page: pageNum)
+                
+            }
+            
+            // Wait until all characters from all the API pages are downloaded
+            self.dispatchGroup.wait()
+            
+        }
+        
+        let operation2 = BlockOperation {
+            
+            // Pass the characters back to the view controller
+            DispatchQueue.main.async {
+                self.delegate?.charactersRetrieved(self.allCharacters)
+            }
+            
+        }
+        
+        operation2.addDependency(operation1)
+        operationQueue.addOperations([operation1, operation2], waitUntilFinished: false)
         
     }
     
