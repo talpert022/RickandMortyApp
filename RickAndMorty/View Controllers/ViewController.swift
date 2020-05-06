@@ -7,12 +7,12 @@
 //
 
 import UIKit
+import Alamofire
 
 class ViewController: UIViewController {
     
     @IBOutlet weak var tableview: UITableView!
     
-    var model = CharacterModel()
     var characters = [Character]()
     var pageNum = 2
     
@@ -27,7 +27,7 @@ class ViewController: UIViewController {
     var isFiltering: Bool {
         return searchController.isActive && !isSearchBarEmpty
     }
-
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -37,8 +37,7 @@ class ViewController: UIViewController {
         tableview.dataSource = self
         
         // Get the character from character model
-        model.delegate = self
-        model.getCharacters()
+        getCharacters()
         
         // Search Controller Set Up
         searchController.searchResultsUpdater = self
@@ -48,6 +47,7 @@ class ViewController: UIViewController {
         definesPresentationContext = true
     }
     
+// MARK: - Segues
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         
         // Detect the index path the user selected
@@ -72,9 +72,10 @@ class ViewController: UIViewController {
         detailVC.character = character
         
     }
-
+    
 }
 
+// MARK: - Table View
 extension ViewController: UITableViewDelegate, UITableViewDataSource {
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -121,6 +122,7 @@ extension ViewController: UITableViewDelegate, UITableViewDataSource {
     
 }
 
+// MARK: - Search Bar
 extension ViewController: UISearchResultsUpdating {
     
     func updateSearchResults(for searchController: UISearchController) {
@@ -138,21 +140,32 @@ extension ViewController: UISearchResultsUpdating {
         tableview.reloadData()
         
     }
-    
 }
-    
 
-extension ViewController: CharacterModelProtocol {
+// MARK: - Alamofire
+extension ViewController {
     
-    func charactersRetrieved(_ characters: [Character]) {
+    func getCharacters() {
         
-        // Set the articles property of the vc to the articles passed back from the model
-        self.characters = characters
+        let dispatchGroup = DispatchGroup()
         
-        // Refresh the tableview
-        tableview.reloadData()
-        
+        for page in 1...25 {
+            
+            let url = "https://rickandmortyapi.com/api/character/?page=\(page)"
+            
+            dispatchGroup.enter()
+            
+            AF.request(url).validate()
+                .responseDecodable(of: CharacterService.self)  { (response) in
+                    guard let charServ = response.value else { return }
+                    self.characters.append(contentsOf: charServ.results!)
+                    self.tableview.reloadData()
+            }
+            
+            dispatchGroup.leave()
+        }
     }
     
 }
+
 
